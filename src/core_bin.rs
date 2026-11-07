@@ -194,7 +194,7 @@ pub fn update() -> Result<String, String> {
 /// This build does not run `hc update` (that command downloads a release).
 pub fn update_to(at_least: Option<&str>) -> Result<String, String> {
     let _ = at_least;
-    Err("this build does not download herdr-core updates. Build https://github.com/itay7891/herdr and set HERDR_CORE. See HARDENING.md.".into())
+    Err("this build does not download herdr-core updates. Build and audit the compatible https://github.com/herdrdev/herdr-core (hc) separately, then set HERDR_CORE to that verified binary. See docs/FORK_INTEGRATION_AUDIT.md.".into())
 }
 
 #[cfg(test)]
