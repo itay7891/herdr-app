@@ -1,4 +1,8 @@
+<!-- Modified by itay7891 (2026) under Apache License 2.0 section 4(b). See HARDENING.md. -->
+
 # Herdr
+
+This is a privacy-hardened fork. It does not phone home for telemetry, feedback, or updates, and it does not download herdr-core. Build and run it from source: [HARDENING.md](HARDENING.md). Do not use the upstream installers below if you want that behavior.
 
 Herdr is a desktop app for terminals and coding agents. Keep work in spaces, see which agents need you, and leave terminals running when you close the window.
 
@@ -85,12 +89,8 @@ Ctrl+Shift+P shows every command and its key (Cmd+Shift+P on macOS). Change any 
 
 ## Updates and privacy
 
-Installed releases check for updates in the background and download a new app beside the running one. It takes over when you quit and reopen, or choose the update action. Your terminals keep running in the core.
-Settings → Updates shows what is available. What's New opens after an update; you can open it again from the command palette.
-Builds from source do not update themselves.
-
-Usage telemetry is on by default in releases. Turn it off in Settings → Privacy.
-Mods are trusted code, not sandboxed extensions. Read [security and privacy](docs/security.md) before installing someone else's mod.
+This fork does not check for or download updates, and it does not send telemetry or feedback. Details and the macOS build steps are in [HARDENING.md](HARDENING.md).
+Mods are trusted code, not sandboxed extensions, unless you turn them off with `"mods": false` or `HERDR_MODS=0`. Read [security and privacy](docs/security.md) before installing someone else's mod.
 
 ## For agents
 

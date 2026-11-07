@@ -1,4 +1,6 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
 //! Live settings and the resolved layout look, including persisted app zoom.
+//! `mods` can stop JavaScript mods from running. See HARDENING.md.
 //!
 //! A theme is a palette plus optional color overrides: a built-in preset
 //! (graphite, ink, moss, paper) or `themes/<name>.json`. Chrome colors are
@@ -98,6 +100,7 @@ const THEMES: &[(&str, &str)] = &[
     ("atom-one-dark", include_str!("../defaults/themes/atom-one-dark.json")),
     ("win98", include_str!("../defaults/themes/win98.json")),
 ];
+#[allow(dead_code)] // theme-file test and the old report sanitizer
 pub const SHIPPED_THEMES: &[&str] = &["atom-one-dark", "win98"];
 
 /// `themes/<name>.json`: a palette, plus `colors` overrides like settings.json's.
@@ -383,9 +386,14 @@ pub struct Person {
     /// The panels' font (their sizes follow zoom).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ui_font: Option<String>,
-    /// Anonymous usage data (telemetry.rs). On unless set to false.
+    /// Anonymous usage data. Ignored: this build does not collect or send it.
     #[serde(skip_serializing_if = "is_true")]
     pub telemetry: bool,
+    /// Run JavaScript mods. `false` stops loading them. `HERDR_MODS=0` forces
+    /// this off for the process and wins over the file. Default on, because
+    /// the window chrome is mods.
+    #[serde(skip_serializing_if = "is_true")]
+    pub mods: bool,
     /// Allow terminal programs (including remote ones) to copy text locally.
     #[serde(skip_serializing_if = "is_true")]
     pub clipboard_write: bool,
@@ -453,6 +461,7 @@ impl Default for Person {
             font_ligatures: false,
             ui_font: None,
             telemetry: true,
+            mods: true,
             clipboard_write: true,
             pane_scrollbars: true,
             minimum_contrast: 1.0,
@@ -672,6 +681,15 @@ pub fn load_person() -> Result<Person, String> {
         return Err(format!("zoom {} is outside {ZOOM_MIN}..{ZOOM_MAX}", person.zoom));
     }
     Ok(person)
+}
+
+/// `HERDR_MODS=0` (or false/off/no) forces mods off. Otherwise settings.json
+/// `mods`, which defaults to on. A broken settings file does not turn them off.
+pub fn mods_enabled() -> bool {
+    if std::env::var("HERDR_MODS").ok().is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "0" | "false" | "off" | "no")) {
+        return false;
+    }
+    load_person().map(|p| p.mods).unwrap_or(true)
 }
 
 /// The value of settings.json's own `telemetry`, read even when the file has
@@ -908,6 +926,16 @@ mod tests {
     }
 
     #[test]
+    fn mods_default_on_and_can_be_disabled_in_settings() {
+        let default: Person = serde_json::from_str("{}").unwrap();
+        assert!(default.mods);
+        let off: Person = serde_json::from_str(r#"{"mods":false}"#).unwrap();
+        assert!(!off.mods);
+        assert_eq!(serde_json::to_value(&off).unwrap()["mods"], false);
+        assert!(serde_json::to_value(&default).unwrap().get("mods").is_none());
+    }
+
+    #[test]
     fn program_clipboard_writes_default_on_and_can_be_disabled() {
         let default: Person = serde_json::from_str("{}").unwrap();
         assert!(default.clipboard_write);
@@ -941,7 +969,7 @@ mod tests {
     /// settings.json key.
     #[test]
     fn the_guide_explains_every_setting() {
-        let all = Person { core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), ui_font: Some(String::new()), telemetry: false, clipboard_write: false, appearance: Appearance::Light, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
+        let all = Person { core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), ui_font: Some(String::new()), telemetry: false, mods: false, clipboard_write: false, appearance: Appearance::Light, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
         let keys: Vec<String> = serde_json::to_value(&all).unwrap().as_object().unwrap().keys().cloned().collect();
         let guide = include_str!("../defaults/AGENTS.md");
         let section = guide.split("## The person").nth(1).and_then(|s| s.split("\n## ").next()).unwrap_or_default();

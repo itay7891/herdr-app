@@ -1,7 +1,13 @@
-//! The app's own updates. An installed app (Linux: `~/.local/share/herdr-app`,
-//! macOS: `Herdr.app`) checks `releases.herdr.dev/app/latest.json` a little
-//! after it opens and every hour, downloads a newer build for this
-//! machine, checks its sha256 and unpacks it next to itself (`<install>.new`).
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! Self-update is compiled out of this build. See HARDENING.md.
+//!
+//! The checker below stays so its tests still compile. `updates_enabled` is
+//! false, so none of it runs. The curl helpers exist only in test builds.
+//!
+//! Historical behavior, not what this build does: an installed app (Linux:
+//! `~/.local/share/herdr-app`, macOS: `Herdr.app`) checked a release manifest
+//! a little after it opened and every hour, downloaded a newer build for this
+//! machine, checked its sha256 and unpacked it next to itself (`<install>.new`).
 //! The frame then shows "Restart"; the swap happens on restart or the next
 //! quit, or before opening the next window after a crash. The first start
 //! after a swap runs `hc update` for the core.
@@ -44,7 +50,8 @@ fn find_root() -> Option<PathBuf> {
     }
 }
 
-/// The folder or bundle name inside a release tarball.
+/// The folder or bundle name inside a release tarball. Test builds only.
+#[cfg(test)]
 const PACKED: &str = if cfg!(target_os = "macos") { "Herdr.app" } else { "herdr-app" };
 
 fn beside(root: &Path, suffix: &str) -> PathBuf {
@@ -67,6 +74,11 @@ fn target() -> String {
         "linux"
     };
     format!("{os}-{}", std::env::consts::ARCH)
+}
+
+/// Always false. Not a setting: this build cannot turn release downloads back on.
+fn updates_enabled() -> bool {
+    false
 }
 
 fn releases() -> String {
@@ -117,12 +129,15 @@ pub fn set_core(version: Option<String>, managed: Option<String>) {
 }
 
 fn checks_app() -> Option<PathBuf> {
+    if !updates_enabled() {
+        return None;
+    }
     root().filter(|_| option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some())
 }
 
 /// A release build checks the core; a source build only when pointed at a test release server.
 fn checks_core() -> bool {
-    option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some()
+    updates_enabled() && (option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some())
 }
 
 /// For the settings screen: both programs, what's waiting, when we last looked.
@@ -238,6 +253,10 @@ fn after_update_target<'a>(have: &str, latest: Option<&'a CoreRelease>, generati
 
 /// `hc update` (terminals keep running; the app reconnects when the core restarts).
 pub fn update_core() {
+    if !updates_enabled() {
+        CORE.lock().unwrap().error = Some("core updates are disabled in this build".into());
+        return;
+    }
     {
         let mut c = CORE.lock().unwrap();
         if c.updating {
@@ -311,6 +330,13 @@ fn check_from(root: &Path, releases: &str) -> Result<Option<String>, String> {
 
 /// Downloads, checks and unpacks a release into `work`; returns the app inside.
 fn unpack(url: &str, sha: &str, work: &Path) -> Result<PathBuf, String> {
+    #[cfg(not(test))]
+    {
+        let _ = (url, sha, work);
+        return Err("release downloads are compiled out of this build".into());
+    }
+    #[cfg(test)]
+    {
     let tarball = work.join("app.tar.gz");
     run(crate::spawn::command(system("curl")).args(["-fsSL", "--max-time", "600", "-o"]).arg(&tarball).arg(url))?;
     let bytes = std::fs::read(&tarball).map_err(|e| e.to_string())?;
@@ -325,8 +351,10 @@ fn unpack(url: &str, sha: &str, work: &Path) -> Result<PathBuf, String> {
         prepare_macos_bundle(&app, &signature)?;
     }
     Ok(app)
+    }
 }
 
+#[cfg(test)]
 fn prepare_macos_bundle(app: &Path, signature: &std::process::Output) -> Result<(), String> {
     if release_signature(signature.status.success(), &String::from_utf8_lossy(&signature.stderr))? {
         run(Command::new("/usr/bin/codesign").args(["--verify", "--deep", "--strict"]).arg(app))?;
@@ -341,6 +369,7 @@ fn prepare_macos_bundle(app: &Path, signature: &std::process::Output) -> Result<
     Ok(())
 }
 
+#[cfg(test)]
 fn release_signature(success: bool, signature: &str) -> Result<bool, String> {
     if success && signature.lines().any(|line| line.starts_with("Authority=Developer ID Application:")) {
         Ok(true)
@@ -354,7 +383,8 @@ fn release_signature(success: bool, signature: &str) -> Result<bool, String> {
 }
 
 /// curl and tar: on Windows its own (System32), since Git's tar, often first
-/// on PATH, takes `C:\...` for a remote host.
+/// on PATH, takes `C:\...` for a remote host. Test builds only.
+#[cfg(test)]
 pub fn system(name: &str) -> PathBuf {
     match std::env::var_os("SystemRoot").filter(|_| cfg!(windows)) {
         Some(root) => PathBuf::from(root).join("System32").join(format!("{name}.exe")),
@@ -368,13 +398,22 @@ pub(crate) fn sha256(bytes: &[u8]) -> String {
 }
 
 fn curl_text(url: &str) -> Result<String, String> {
+    #[cfg(not(test))]
+    {
+        let _ = url;
+        return Err("release downloads are compiled out of this build".into());
+    }
+    #[cfg(test)]
+    {
     let out = crate::spawn::command(system("curl")).args(["-fsSL", "--max-time", "30", url]).stdin(Stdio::null()).output().map_err(|e| format!("curl: {e}"))?;
     if !out.status.success() {
         return Err(format!("{url}: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
     String::from_utf8(out.stdout).map_err(|e| e.to_string())
+    }
 }
 
+#[cfg(test)]
 fn run(cmd: &mut Command) -> Result<(), String> {
     let out = cmd.stdin(Stdio::null()).output().map_err(|e| format!("{:?}: {e}", cmd.get_program()))?;
     if out.status.success() {
@@ -446,6 +485,9 @@ fn startup_target<'a>(running: &str, staged: Option<&'a str>, relaunched: Option
 /// Recover a staged hotfix even when the previous window never quit cleanly.
 /// The inherited expected version allows only one automatic relaunch.
 pub fn apply_on_startup() -> bool {
+    if !updates_enabled() {
+        return false;
+    }
     let expected = std::env::var("HERDR_APP_UPDATE_EXPECTED").ok();
     if let Some(expected) = &expected {
         // SAFETY: startup runs before any app threads. Do not leak the guard
@@ -470,6 +512,9 @@ pub fn apply_on_startup() -> bool {
 /// Windows lets a running program's folder be renamed, not deleted: the old
 /// one goes on the next start (`after_update`).
 pub fn apply() -> bool {
+    if !updates_enabled() {
+        return false;
+    }
     let Some(root) = root() else { return false };
     let staged = staged_version(&root);
     if ready().as_deref() != staged.as_deref() || !staged.as_deref().is_some_and(|version| newer(version, env!("CARGO_PKG_VERSION"))) {
@@ -576,6 +621,10 @@ fn marker() -> PathBuf {
 /// Cores before 0.1.5 lack `--version`: they keep their same-generation update
 /// path. A core a package manager owns is left alone (hc says so).
 pub fn after_update() {
+    if !updates_enabled() {
+        let _ = std::fs::remove_file(marker());
+        return;
+    }
     if std::fs::remove_file(marker()).is_err() {
         return;
     }

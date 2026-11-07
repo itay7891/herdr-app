@@ -1,5 +1,8 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
 //! Mods: folders of JavaScript under ~/.config/herdr-app/mods that agents write and
 //! Herdr runs live (gpui-shell), plus the `herdr` module they import.
+//! When mods are off, the host grants no exec, network, or file roots.
+//! See HARDENING.md.
 
 use crate::layout::Node;
 use gpui::App;
@@ -270,6 +273,7 @@ fn clone_mod_at(mods: &Path, name: &str, to: &str) -> std::io::Result<()> {
 /// Mods in use by kind, for telemetry: the shipped ones as shipped (by
 /// name), how many shipped ones were edited, how many are the person's own
 /// (never their names).
+#[allow(dead_code)] // report-shape tests; the app no longer builds a telemetry report
 pub fn kinds(names: &std::collections::BTreeSet<String>) -> (Vec<String>, usize, usize) {
     let text = std::fs::read_to_string(app_dir().join("installed.json")).unwrap_or_default();
     let installed: Installed = serde_json::from_str(&text).unwrap_or_default();
@@ -1138,6 +1142,9 @@ pub fn apply_theme(cx: &mut App) {
 }
 
 fn capabilities() -> Capabilities {
+    if !crate::settings::mods_enabled() {
+        return Capabilities::new();
+    }
     Capabilities::new()
         .read_roots([home()])
         .write_roots([app_dir()])

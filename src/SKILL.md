@@ -1,5 +1,7 @@
 # herdr-app: drive the person's window
 
+<!-- Modified by itay7891 (2026) under Apache License 2.0 section 4(b). See HARDENING.md. -->
+
 Herdr shows spaces, tabs and panes. herdr-core (`hc`) runs their terminals
 and keeps them alive when the window closes. Use `herdr-app` only to change
 what the person sees. For starting, reading, messaging, waiting on or cleaning
@@ -20,8 +22,9 @@ prints the built-in command list even without an open window. Do not launch bare
 signal or restart the person's app or core. A window closing does not kill
 its terminals.
 
-`app.check_updates` checks for newer releases. Settings reports "Up to date"
-only after a successful check; on failure, check the connection and retry.
+`app.check_updates`, `app.update`, and `app.update_core` do not download
+anything in this build. Point `HERDR_CORE` or settings.json `core` at a
+local herdr-core. See HARDENING.md.
 
 ## Show something when asked
 
@@ -104,7 +107,9 @@ those files or the generated guide. The app rewrites them on start.
 
 - Home defaults to `~/.config/herdr-app`; `HERDR_APP_HOME` selects another.
 - Mods live in `mods/<name>/` with `main.js` and optional `mod.json`.
-  They are trusted JavaScript with command and network access.
+  They are trusted JavaScript: `exec` runs programs, `fetch` contacts any
+  host, and `readTextFile` reads files the user can read. `"mods": false`
+  in settings.json or `HERDR_MODS=0` stops the window from running them.
   `"focusable": true` in `mod.json` lets `pane.go` move onto a copy; it receives
   `"focus"` from `nextCommand()` and focuses its own keyboard handle.
 - Shipped mods belong to Herdr: duplicate with `mod.clone` before editing.

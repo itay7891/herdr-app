@@ -1,3 +1,5 @@
+<!-- Modified by itay7891 (2026) under Apache License 2.0 section 4(b). See HARDENING.md. -->
+
 # Security and privacy
 
 ## Mods have your access
@@ -20,7 +22,7 @@ Mods may store sensitive data here. Herdr does not encrypt this folder.
 The [installed guide's file map](../defaults/AGENTS.md#the-files) explains the files.
 
 Spaces, tabs and splits are stored in each machine's core document, not in the app home.
-Terminals and their output belong to [herdr-core](https://github.com/herdrdev/herdr-core).
+Terminals and their output belong to herdr-core. This fork expects a core you build from [itay7891/herdr](https://github.com/itay7891/herdr).
 Removing the app home does not stop the core or erase its data.
 
 The app exposes a local control socket in its home so agents can inspect and drive the window.
@@ -29,40 +31,24 @@ Remote connections use SSH through the core.
 
 ## Updates and signing
 
-Installed releases check the Herdr release service, download an update, and check its SHA-256 checksum against the release manifest before unpacking it.
-The app switches to the downloaded version on quit. Source builds do not update themselves.
-Core updates are handled separately by the core's updater.
+This build does not check for updates, download them, or swap in a staged bundle.
+`app.check_updates`, `app.update`, and `app.update_core` do not contact a release server.
+The app also does not run the core installer or `hc update`.
+See [HARDENING.md](../HARDENING.md).
 
-A checksum from the same service detects a damaged download; it is not an independent signature on the manifest.
-The app does not verify a separate cryptographic signature on update manifests.
-
-The release pipeline supports Apple Developer ID signing on macOS and Azure artifact signing on Windows when their credentials are configured.
-Without them, packages can be unsigned or ad hoc signed.
-On macOS the installer and updater verify certificate-signed bundles and preserve their signatures.
-Apple notarization is tested separately; it is not required for publishing a release.
-Do not assume every download is notarized or signed.
+Upstream release builds check a release service and download an update. That client is not used here: the helpers that would call curl return an error unless the crate is built for its unit tests.
 
 ## Telemetry
 
-Usage telemetry is **on by default**. Release builds send a small daily report to `https://telemetry.herdr.dev/v1/report` with a random install ID.
-Reports include app and core versions, OS and architecture, bucketed usage time and counts, known agent names, built-in layout names, mod counts, app command names, and fixed event counters.
-Custom layout names become `custom`; custom mod names are not sent.
-Terminal text, prompts, file contents, folder paths and free-text names are not included.
+Usage telemetry and feedback upload are compiled out. The app does not collect a daily report, does not keep an install id for one, and does not post to a telemetry server.
+`HERDR_TELEMETRY_URL` and `HERDR_FEEDBACK_URL` do not turn sending back on.
+The `telemetry` field in settings.json is accepted and ignored.
+`telemetry()` tells mods that sending is off because it was compiled out.
 
-Turn it off in **Settings → Privacy**. That page also lets you inspect the report.
-Or set this field in your existing `settings.json`:
+## Mods
 
-```json
-{
-  "telemetry": false
-}
-```
-
-Turning it off deletes the local install ID and unsent reports. It cannot recall reports already sent.
-For one run, set `DO_NOT_TRACK=1` or `HERDR_TELEMETRY=0`. CI environments disable collection too.
-Ordinary source builds collect locally while enabled but do not send, unless pointed at a test endpoint with `HERDR_TELEMETRY_URL`.
-
-Telemetry being off does not stop update checks, mod network requests or feedback you choose to send.
-Feedback is drafted for you to review and send, not sent silently.
+Mods are JavaScript. While they run they can execute programs, fetch any URL, and read files under the home directory. Writes through the file API stay in the app home; a program the mod runs does not.
+Set `"mods": false` in settings.json to stop the window from loading them, or start the app with `HERDR_MODS=0`, which wins over the file.
+The sidebar, tabs, menus, and settings screen are mods. Turning them off leaves the terminals without that chrome.
 
 [Back to Herdr](../README.md)

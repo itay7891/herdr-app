@@ -1,3 +1,6 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! Update commands do not download anything in this build. See HARDENING.md.
+//!
 //! Every command the app runs, defined once. Keys, menus, mods and
 //! `herdr-app do` all run these; key checks, `herdr-app commands` and the docs come
 //! from this list. Mods' own commands are `<mod>.<command>`.
@@ -89,14 +92,14 @@ pub const COMMANDS: &[Command] = &[
     cmd("app.feedback", &[opt("message"), opt("from")], "Draft feedback for the person to review and send (from: person or agent)."),
     cmd("app.palette", &[], "Toggle the command palette: every command by name, with its key; calling again closes it."),
     cmd("app.settings", &[opt("section")], "Open the settings (section: look, alerts, updates)."),
-    cmd("app.check_updates", &[], "Look for a newer Herdr and herdr-core now."),
-    cmd("app.update_core", &[], "Update herdr-core to its latest release of this generation; terminals keep running."),
+    cmd("app.check_updates", &[], "Does nothing in this build: update checks and downloads are compiled out."),
+    cmd("app.update_core", &[], "Does nothing in this build: herdr-core is not downloaded. Point settings.json core or HERDR_CORE at a local binary."),
     cmd("app.reset", &[], "The escape hatch: set the shown layout and keys aside, back to the default screen."),
     cmd("app.theme", &[req("name")], "Use a theme (a preset or themes/<name>.json)."),
     cmd("app.zoom_in", &[], "Make everything bigger."),
     cmd("app.zoom_out", &[], "Make everything smaller."),
     cmd("app.zoom_reset", &[], "Back to normal size."),
-    cmd("app.update", &[], "Restart into the update Herdr downloaded (your terminals keep running)."),
+    cmd("app.update", &[], "Does nothing in this build: self-update is compiled out."),
     cmd("app.quit", &[], "Quit (macOS)."),
     cmd("app.hide", &[], "Hide the app (macOS)."),
     cmd("app.hide_others", &[], "Hide other apps (macOS)."),

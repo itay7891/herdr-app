@@ -1,3 +1,6 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! This build does not download herdr-core or the app. See HARDENING.md.
+//!
 //! The frame's core screens, shown instead of the main window until a core
 //! that can serve this app runs:
 //! - none found (core_bin.rs): install it for me (the core's own installer),
@@ -16,15 +19,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 const ICON: &[u8] = include_bytes!("../assets/icons/herdr-ui-icon-clean.png");
-#[cfg(not(windows))]
-const APP_INSTALL: &str = "curl -fsSL https://releases.herdr.dev/app/install.sh | sh";
-#[cfg(windows)]
-const APP_INSTALL: &str = "powershell -c \"irm https://releases.herdr.dev/app/install.ps1 | iex\"";
-#[cfg(not(windows))]
-const CORE_INSTALL: &str = "curl -fsSL https://releases.herdr.dev/core/install.sh | sh";
-#[cfg(windows)]
-const CORE_INSTALL: &str = "powershell -c \"irm https://releases.herdr.dev/core/install.ps1 | iex\"";
-const CORE_PLACE: &str = if cfg!(windows) { r"%LOCALAPPDATA%\Programs\herdr-core" } else { "~/.local/bin" };
 
 /// What's missing before the main window can open.
 pub enum Need {
@@ -106,8 +100,9 @@ impl Setup {
         .detach();
     }
 
-    fn install(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.run("Installing herdr-core…", || crate::core_bin::install().map(Some), window, cx);
+    fn install(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.state = State::Failed(crate::core_bin::install().unwrap_err());
+        cx.notify();
     }
 
     fn update(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -141,8 +136,8 @@ impl Setup {
         match &self.need {
             Need::Install => (
                 "Herdr needs herdr-core".into(),
-                "herdr-core runs your terminals and agents, and keeps them alive when this window closes. Herdr couldn't find it on this computer.".into(),
-                format!("Install it for me puts it in {CORE_PLACE} (with hc), like its own installer: {CORE_INSTALL}"),
+                "herdr-core runs your terminals and agents, and keeps them alive when this window closes. Herdr couldn't find it on this computer. This build does not download one.".into(),
+                "Set HERDR_CORE to a binary you built, or choose it below. It must answer --version with \"hc …\". See HARDENING.md.".into(),
             ),
             Need::Connect(error) => (
                 "Herdr can't connect to herdr-core".into(),
@@ -151,18 +146,18 @@ impl Setup {
             ),
             Need::Fix(Mismatch::TooOld { have, need }) => (
                 "Herdr needs a newer herdr-core".into(),
-                format!("Yours is {have}; this Herdr needs {need} or newer. Updating keeps your terminals running."),
-                "Or update it yourself: hc update".into(),
+                format!("Yours is {have}; this Herdr needs {need} or newer. This build does not download a newer core."),
+                "Build a newer core from https://github.com/itay7891/herdr and point HERDR_CORE at it. See HARDENING.md.".into(),
             ),
             Need::Fix(Mismatch::Missing(methods)) => (
                 "Herdr needs a newer herdr-core".into(),
-                format!("Your herdr-core can't do everything this Herdr needs ({}). Updating keeps your terminals running.", methods.join(", ")),
-                "Or update it yourself: hc update".into(),
+                format!("Your herdr-core can't do everything this Herdr needs ({}). This build does not download a newer core.", methods.join(", ")),
+                "Build a newer core from https://github.com/itay7891/herdr and point HERDR_CORE at it. See HARDENING.md.".into(),
             ),
             Need::Fix(Mismatch::Newer { generation }) => (
                 "This Herdr is older than your herdr-core".into(),
-                format!("Your herdr-core speaks a newer protocol (generation {generation}) than this Herdr understands. Update Herdr; your terminals keep running."),
-                format!("Update Herdr: {APP_INSTALL}"),
+                format!("Your herdr-core speaks a newer protocol (generation {generation}) than this Herdr understands. This build does not download a newer app."),
+                "Build this app from source. See HARDENING.md.".into(),
             ),
         }
     }
@@ -192,7 +187,7 @@ impl Render for Setup {
             Need::Install => div()
                 .flex()
                 .gap(px(10.0))
-                .child(button("install", "Install it for me", true).when(!busy, |d| d.on_click(cx.listener(|this, _, w, cx| this.install(w, cx)))))
+                .child(button("install", "Why it was not installed", true).when(!busy, |d| d.on_click(cx.listener(|this, _, w, cx| this.install(w, cx)))))
                 .child(button("choose", "I have it somewhere…", false).when(!busy, |d| d.on_click(cx.listener(|this, _, w, cx| this.choose(w, cx))))),
             Need::Connect(_) => div().child(button("retry", "Retry", true).on_click(cx.listener(|this, _, w, cx| this.start(w, cx)))),
             Need::Fix(Mismatch::Newer { .. }) => div()
