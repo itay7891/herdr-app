@@ -2,6 +2,8 @@
 
 # Hardened herdr-app
 
+> **STOP — core compatibility not verified (2026-11-07).** The instructions below that build `itay7891/herdr` are incorrect for this GUI: that repository is the legacy `herdr` TUI (v0.9.5), while this application requires the separate `herdr-core` (`hc`) JSON-RPC runtime. Do **not** run the build/start steps below as a working integration recipe. First create and audit a fork of `herdrdev/herdr-core`, then validate its protocol and security in an isolated test environment. See [`docs/FORK_INTEGRATION_AUDIT.md`](docs/FORK_INTEGRATION_AUDIT.md). The security claims in this document apply to the app fork only and have not been independently verified by a build or network test.
+
 This fork of [herdr-app](https://github.com/herdrdev/herdr-app) is for personal use. It keeps the Apache License 2.0 (`LICENSE`, `NOTICE`, `THIRD-PARTY-NOTICES`). Changed files start with a notice that they were modified, as required by Apache License 2.0 section 4(b).
 
 The desktop app is a window. Terminals and agents run in herdr-core (`hc`). This document covers the app. A separate checkout of [itay7891/herdr](https://github.com/itay7891/herdr) is the core to build locally.
