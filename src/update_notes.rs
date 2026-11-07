@@ -1,3 +1,5 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! Release-note media is not downloaded. See HARDENING.md.
 //! Cumulative release notes and this launch's update range. Reading notes never
 //! changes the last successful version; only expanded spotlights are recorded.
 use serde::{Deserialize, Serialize};
@@ -188,19 +190,8 @@ fn fetch_media(notes: &[Note]) {
     for media in notes.iter().flat_map(|n| &n.items).flat_map(|item| &item.media) {
         let url = &media.path;
         if preview_media(url) { continue; }
-        let file = media_path(url);
-        if file.is_file() { continue; }
-        // The same URL may be in both the startup and newly fetched feed.
-        let temp = file.with_extension(format!("{:?}.new", std::thread::current().id()));
-        let result = crate::spawn::command(crate::update::system("curl"))
-            .args(["-fsSL", "--max-time", "30", "--max-filesize", "16777216", "-o"])
-            .arg(&temp).arg(url).stdin(std::process::Stdio::null()).output();
-        if result.is_ok_and(|out| out.status.success())
-            && std::fs::rename(&temp, &file).is_ok()
-        {
-            MEDIA.lock().unwrap().0.remove(&file);
-        }
-        let _ = std::fs::remove_file(temp);
+        // This build does not download release media. A file already on disk can still be shown.
+        let _ = url;
     }
 }
 

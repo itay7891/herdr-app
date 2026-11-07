@@ -1,3 +1,7 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! JavaScript mods do not load when settings.json `mods` is false or
+//! `HERDR_MODS=0`. See HARDENING.md.
+//!
 //! The window. The chrome (`layouts/<name>.json`) is a tree of the locked
 //! primitives; a `{ "tab": "active" }` block shows the selected
 //! tab's terminals as it arranges them. Every visible part that isn't a
@@ -865,6 +869,7 @@ impl AppWindow {
         if s_time.is_none() || s_time != self.watched.settings {
             let loaded = settings::load_person();
             crate::telemetry::set_setting(settings::telemetry_setting(&loaded));
+            let mods_before = self.person.mods;
             match loaded {
                 Ok(p) => {
                     self.person = p;
@@ -874,6 +879,16 @@ impl AppWindow {
             }
             self.watched.settings = mtime(&settings::path());
             self.apply_look(window, cx);
+            let mods_now = settings::mods_enabled();
+            if mods_before != self.person.mods || (!mods_now && !self.copies.is_empty()) {
+                if !mods_now {
+                    let slots: Vec<String> = self.copies.keys().cloned().collect();
+                    for slot in slots {
+                        self.remove_copy(&slot, window, cx);
+                    }
+                }
+                self.sync(window, cx);
+            }
         }
         let k_time = mtime(&crate::keys::path());
         if k_time.is_none() || k_time != self.watched.keys {
@@ -1218,6 +1233,9 @@ impl AppWindow {
                 }
             }
         }
+        if !settings::mods_enabled() {
+            mods.clear();
+        }
         (terms, mods)
     }
 
@@ -1225,6 +1243,9 @@ impl AppWindow {
     /// nodes, inactive stack children, hidden floats), every pane mod of every
     /// tab (zoomed or not shown), and the overlays.
     fn owned_mods(&self) -> HashMap<String, Instance> {
+        if !settings::mods_enabled() {
+            return HashMap::new();
+        }
         let mut out = HashMap::new();
         let inst = |name: &String, props: &Value| Instance { name: name.clone(), props: props.clone() };
         for n in self.chrome.walk() {
@@ -1639,6 +1660,15 @@ impl AppWindow {
     }
 
     fn load(&self, inst: Instance, window: &mut Window, cx: &mut Context<Self>) -> Copy {
+        if !settings::mods_enabled() {
+            return Copy {
+                inst,
+                id: 0,
+                root: None,
+                _watch: None,
+                error: Some("mods are off (settings.json \"mods\": false, or HERDR_MODS=0)".into()),
+            };
+        }
         let mut copy = Copy { inst, id: 0, root: None, _watch: None, error: None };
         let (Some(runtime), Some(folder)) = (&self.runtime, self.folders.get(&copy.inst.name)) else {
             copy.error = Some(format!("no mod folder ~/.config/herdr-app/mods/{}", copy.inst.name));

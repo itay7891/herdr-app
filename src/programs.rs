@@ -1,3 +1,4 @@
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
 //! What runs in a terminal, as people see it: a name, an icon and a tile.
 //! One table for every mod: `defaults/programs.json` (built in), with the
 //! person's `programs.json` in the home folder on top (entry by entry). The
@@ -194,6 +195,7 @@ pub fn name(app: &str) -> String {
 
 /// An agent's 7501 `app` as a name Herdr ships (`claude` for `claude-code`),
 /// else `other` (`unknown` when it gave none): never the person's own words.
+#[allow(dead_code)] // report-shape tests; the app no longer builds a telemetry report
 pub fn agent_name(app: Option<&str>) -> String {
     static NAMES: std::sync::OnceLock<BTreeMap<String, String>> = std::sync::OnceLock::new();
     let names = NAMES.get_or_init(|| {

@@ -1,5 +1,6 @@
 # Herdr app
 
+<!-- Modified by itay7891 (2026) under Apache License 2.0 section 4(b). See HARDENING.md. -->
 <!-- Written by the Herdr app on every start. Edits here are overwritten. -->
 
 This folder is **the Herdr app's whole interface, as files**. The Herdr app
@@ -661,7 +662,9 @@ What's about the user, never a look:
   including the Play buttons in Settings > Alerts.
 - `core`: the herdr-core binary to use, when it isn't where Herdr looks
   (PATH, the login shell's PATH, `~/.local/bin`, Homebrew, mise, Nix,
-  cargo). Read at start.
+  cargo). Read at start. `HERDR_CORE` wins over this field and, when set,
+  is the only candidate (a bad path is not replaced from PATH). The binary
+  must answer `--version` with `hc …`. This build does not download one.
 - `font`, `font_size`, `ui_font`: used where the layout doesn't set its
   own. Herdr (main) leaves these unset. Bigger panels: `zoom`.
 - `font_ligatures`: programming ligatures are off by default; set `true` to
@@ -673,31 +676,24 @@ What's about the user, never a look:
   precedence as fonts.
 - `appearance`: `"light"` or `"dark"` always; absent, the system's. A layout
   with a light and a dark theme shows the matching one.
-- Updates: an installed app downloads them by itself and offers Restart and
-  What changed. If the app crashes or is killed with a verified newer update
-  waiting, the next launch installs it before opening a window. The first
-  start after an app update also updates herdr-core
-  to the latest release of the same generation, keeping terminals running.
-  Settings → Updates keeps app and core actions together;
-  its What's new button opens the waiting update's release range, or this
-  version's notes, in the What's new window. Reading never clears the waiting-update dot.
-  Rare spotlight releases open What’s new after restart, once; otherwise a
-  quiet Updated pill lasts for that launch. A build from source never updates.
-  Curated notes come from the bundled root `CHANGELOG.md`; remote notes and
-  media are optional. `update-notes.json` records the last successful app
-  version and presented spotlights; `update-notes-cache.md` caches remote
-  notes; `update-notes-media/` caches HTTPS images (including animated WebP clips),
-  referenced below its item in the changelog as `![label](https://...)`.
+- Updates: this build does not check for, download, or apply app or core
+  updates. `app.check_updates`, `app.update`, and `app.update_core` do nothing
+  useful. Build both programs from source (see HARDENING.md). Curated notes
+  still come from the bundled changelog; remote notes and media are not downloaded.
+  What's new reads the bundled `CHANGELOG.md`. It does not fetch a changelog
+  or images. `update-notes.json` records the last successful app version and
+  presented spotlights. `HERDR_NOTES_MEDIA_DIR` can still copy a local preview
+  file into `update-notes-preview`; nothing is fetched over HTTPS.
+  Images in the changelog are referenced as `![label](https://...)`.
   Each version uses `### New` with `- **Headline.** detail` highlights and
   `### Fixed` with short bullet items. Unsectioned bullets are plain items.
   Notes expose `items` with `headline`, `detail`, `fixed`, and cached `media`
   objects (`path`, pixel `width`, pixel `height`). Highlights use matching cards:
   edge-to-edge media at its original aspect ratio, then headline and detail.
-  For local release-media previews only, launch with
+  For a local preview of those images, launch with
   `HERDR_NOTES_MEDIA_DIR=/var/tmp/herdr-notes-media`: URLs under
   `https://media.herdr.dev/<version>/<scene>.webp` use that directory's
-  `<version>/<scene>.webp` instead of downloading. Without the variable,
-  media uses the normal HTTPS cache.
+  `<version>/<scene>.webp`. Without the variable, missing media stays missing.
   Mods use `updates().notes` and `presentUpdateNotes([version])` only
   for spotlight entries actually shown expanded, not collapsed headlines.
   macOS releases require Apple Silicon; Intel Macs must build from source.
@@ -732,14 +728,16 @@ What's about the user, never a look:
   pane's right edge (default `true`). It shows only when the pane has
   scrollback — never on the alternate screen (editors, pagers) — and
   drags to move through it.
-- `telemetry`: `false` stops anonymous usage data and deletes what wasn't
-  sent (on when absent; Settings → Privacy shows each report word for
-  word, and `telemetry()` in mods). Once a day the app sends counts:
-  version, OS, which known agents ran, how many spaces, tabs and
-  terminals, which layouts, shipped mods and commands were used. Never
-  terminal content, names of files, folders, spaces or the person's own
-  mods; nothing from herdr-core. `DO_NOT_TRACK=1` or `HERDR_TELEMETRY=0`
-  turns it off for one run. A build from source never sends.
+- `telemetry`: ignored. This build does not collect or send usage data,
+  and there is no telemetry endpoint. `telemetry()` reports `sends: false`
+  and `off_because: "compiled out"`.
+- `mods`: `false` stops loading JavaScript mods (the sidebar, tab bar,
+  menus, and settings screen are mods, so the window keeps its terminals
+  and loses that chrome). Absent or `true` runs them. `HERDR_MODS=0`
+  forces them off for that process even if this file says `true`. An agent
+  that can edit this file can turn `mods` back on; the environment variable
+  cannot be overridden from here. See HARDENING.md for what a running mod
+  can do (`exec`, `fetch`, file reads).
 
 ## Programs: `programs.json`
 

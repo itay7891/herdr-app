@@ -1,5 +1,7 @@
-//! Finding herdr-core (`hc`) on this machine. The app doesn't carry one: it
-//! uses the core people installed, or installs the core's own release.
+//! Modified by itay7891 (2026) under Apache License 2.0 section 4(b).
+//! Finding herdr-core (`hc`) on this machine. See HARDENING.md.
+//! The app doesn't carry one and does not download one. `HERDR_CORE` wins,
+//! then settings.json `core`, then PATH and the usual install places.
 //!
 //! Where it looks, in order: `core` in settings.json; this process's PATH;
 //! the person's login shell's PATH (an app opened from the Dock or a
@@ -83,6 +85,15 @@ pub fn version(bin: &Path) -> Option<String> {
 /// The first herdr-core found, or None.
 pub fn find(configured: Option<&str>) -> Option<PathBuf> {
     let home = crate::mods::home();
+    // An explicit local build is the only candidate. A bad path is not
+    // replaced with whatever `hc` happens to be on PATH.
+    if let Ok(explicit) = std::env::var("HERDR_CORE") {
+        let explicit = explicit.trim();
+        if !explicit.is_empty() {
+            let path = expand(explicit, &home);
+            return version(&path).map(|_| path);
+        }
+    }
     let pick = |candidates: Vec<PathBuf>| candidates.into_iter().filter(|c| c.is_file()).find(|c| version(c).is_some());
     if let Some(found) = pick(configured.map(|c| vec![expand(c, &home)]).unwrap_or_default()) {
         return Some(found);
@@ -167,34 +178,10 @@ fn login_shell_path() -> Option<std::ffi::OsString> {
     Some(out.into())
 }
 
-/// Installs the core's latest release with its own installer (into
-/// ~/.local/bin, or HC_INSTALL_DIR), then finds it. Err: what went wrong.
+/// This build does not download herdr-core. Point `HERDR_CORE` or
+/// settings.json `core` at a binary you built. See HARDENING.md.
 pub fn install() -> Result<PathBuf, String> {
-    let releases = std::env::var("HERDR_RELEASES_URL").unwrap_or_else(|_| "https://releases.herdr.dev".into());
-    let mut cmd = if cfg!(windows) {
-        let mut c = crate::spawn::command("powershell");
-        c.args(["-NoProfile", "-Command", &format!("irm {releases}/core/install.ps1 | iex")]);
-        c
-    } else {
-        let mut c = crate::spawn::command("sh");
-        c.args(["-c", &format!("curl -fsSL {releases}/core/install.sh | sh")]);
-        c
-    };
-    let out = cmd.stdin(Stdio::null()).output().map_err(|e| format!("cannot run the installer: {e}"))?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr).trim().to_owned();
-        return Err(if err.is_empty() { "the installer failed".into() } else { err });
-    }
-    let home = crate::mods::home();
-    let dir = std::env::var_os("HC_INSTALL_DIR").map(PathBuf::from).unwrap_or_else(|| {
-        if cfg!(windows) {
-            usual_dirs(&home).remove(0)
-        } else {
-            home.join(".local/bin")
-        }
-    });
-    let bin = dir.join(format!("herdr-core{}", std::env::consts::EXE_SUFFIX));
-    version(&bin).map(|_| bin).ok_or_else(|| "installed, but herdr-core doesn't run".into())
+    Err("this build does not download herdr-core. Set HERDR_CORE, or settings.json \"core\", to a binary you built (it must answer --version with \"hc …\"). See HARDENING.md.".into())
 }
 
 /// Updates the core to its latest release (`hc update`: same generation only,
@@ -204,31 +191,17 @@ pub fn update() -> Result<String, String> {
     update_to(None)
 }
 
-/// `hc update --version X`: at least X (a newer core stays). Cores before 0.1.5 lack it.
+/// This build does not run `hc update` (that command downloads a release).
 pub fn update_to(at_least: Option<&str>) -> Result<String, String> {
-    let mut cmd = crate::spawn::command(path());
-    cmd.args(["update", "--json"]);
-    if let Some(v) = at_least {
-        cmd.args(["--version", v]);
-    }
-    let out = cmd.stdin(Stdio::null()).output().map_err(|e| format!("cannot run hc update: {e}"))?;
-    let reply: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
-    if out.status.success() {
-        let now = reply.get("now").and_then(|v| v.as_str()).unwrap_or("the latest").to_owned();
-        #[cfg(target_os = "macos")]
-        ensure_core_bundle(&now)?;
-        return Ok(now);
-    }
-    let err: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap_or_default();
-    let message = err.pointer("/error/message").and_then(|v| v.as_str()).map(str::to_owned);
-    let hint = err.pointer("/error/hint").and_then(|v| v.as_str()).map(|h| format!(" ({h})")).unwrap_or_default();
-    Err(message.map(|m| m + &hint).unwrap_or_else(|| String::from_utf8_lossy(&out.stderr).trim().to_owned()))
+    let _ = at_least;
+    Err("this build does not download herdr-core updates. Build https://github.com/itay7891/herdr and set HERDR_CORE. See HARDENING.md.".into())
 }
 
-#[cfg(any(target_os = "macos", all(test, unix)))]
+#[cfg(test)]
 const BUNDLE_INSTALL_SCRIPT: &str = "installer=$(curl -fsSL \"$1/core/install.sh\") && case \"$installer\" in *HC_BUNDLE_ONLY*) printf '%s\\n' \"$installer\" | sh ;; *) exit 0 ;; esac";
 
 #[cfg(any(target_os = "macos", all(test, unix)))]
+#[allow(dead_code)]
 fn bundle_completion_path(bin: &Path, home: &Path) -> bool {
     bin.starts_with(home)
         && !bin.ends_with("Contents/MacOS/herdr-core")
@@ -237,54 +210,18 @@ fn bundle_completion_path(bin: &Path, home: &Path) -> bool {
 }
 
 #[cfg(any(target_os = "macos", all(test, unix)))]
+#[allow(dead_code)]
 fn bundle_completion_writable(bin: &Path) -> bool {
     bin.parent().is_some_and(|dir| {
         Command::new("/bin/test").arg("-w").arg(dir).status().is_ok_and(|status| status.success())
     })
 }
 
-/// Old core updaters copied only the bare executable. Finish that upgrade
-/// with the current installer, which retains the complete signed app bundle.
+/// Bundle completion used to download the signed core installer. It does not.
 #[cfg(target_os = "macos")]
-fn ensure_core_bundle(version: &str) -> Result<(), String> {
-    let bin = path();
-    let resolved = bin.canonicalize().unwrap_or_else(|_| bin.clone());
-    if !bundle_completion_path(&resolved, &crate::mods::home()) || !bundle_completion_writable(&resolved) {
-        return Ok(());
-    }
-    // Never replace a contributor's build, package-manager core, or a host app.
-    let official = crate::spawn::command("/usr/bin/codesign")
-        .args(["--verify", "--strict", "-R", "=identifier \"dev.herdr.core\" and anchor apple generic and certificate leaf[subject.OU] = \"2W9652Q7QR\""])
-        .arg(&bin).output().is_ok_and(|out| out.status.success());
-    if !official {
-        return Ok(());
-    }
-    let releases = std::env::var("HERDR_RELEASES_URL").unwrap_or_else(|_| "https://releases.herdr.dev".into());
-    let mut cmd = crate::spawn::command("sh");
-    cmd.args([
-        "-c",
-        BUNDLE_INSTALL_SCRIPT,
-        "sh",
-        &releases,
-    ]);
-    cmd.env("HC_BUNDLE_ONLY", "1");
-    if let Some(v) = version.strip_prefix("hc ") {
-        cmd.env("HC_VERSION", v);
-    }
-    if resolved.is_absolute()
-        && let Some(dir) = resolved.parent()
-    {
-        cmd.env("HC_INSTALL_DIR", dir);
-    }
-    let out = cmd
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("cannot finish core bundle installation: {e}"))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
-    }
+#[allow(dead_code)]
+fn ensure_core_bundle(_version: &str) -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(test)]

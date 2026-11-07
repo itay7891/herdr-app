@@ -1,0 +1,11 @@
+herdr-app
+Copyright the original authors.
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+This distribution is a modified fork (itay7891/herdr-app).
+Changed files carry a prominent notice stating that they were changed,
+as required by Apache License 2.0 section 4(b). Those changes are described
+in HARDENING.md.
+
+THIRD-PARTY-NOTICES lists third-party components. This fork does not remove
+upstream copyright or license notices.
