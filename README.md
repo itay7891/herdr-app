@@ -6,6 +6,8 @@ This is a privacy-hardened fork. It does not phone home for telemetry, feedback,
 
 Herdr is a desktop app for terminals and coding agents. Keep work in spaces, see which agents need you, and leave terminals running when you close the window.
 
+> **Compatibility warning (fork audit, 2026-11-07):** This GUI requires the separate `herdr-core` (`hc`) runtime. The `itay7891/herdr` fork is the older TUI application, **not** the compatible core. Do not use the core build instructions in `HARDENING.md` until a compatible, audited `herdr-core` fork is available. See [integration audit](docs/FORK_INTEGRATION_AUDIT.md). No production deployment has been verified.
+
 ## Install
 
 ### Linux and macOS
